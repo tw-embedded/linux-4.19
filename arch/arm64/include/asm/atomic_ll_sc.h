@@ -37,7 +37,7 @@
  * (the optimize attribute silently ignores these options).
  */
 
-#define ATOMIC_OP(op, asm_op)						\
+#define ATOMIC_OP(op, asm_op, constraint)						\
 __LL_SC_INLINE void							\
 __LL_SC_PREFIX(atomic_##op(int i, atomic_t *v))				\
 {									\
@@ -51,11 +51,11 @@ __LL_SC_PREFIX(atomic_##op(int i, atomic_t *v))				\
 "	stxr	%w1, %w0, %2\n"						\
 "	cbnz	%w1, 1b"						\
 	: "=&r" (result), "=&r" (tmp), "+Q" (v->counter)		\
-	: "Ir" (i));							\
+	: constraint "r" (i));							\
 }									\
 __LL_SC_EXPORT(atomic_##op);
 
-#define ATOMIC_OP_RETURN(name, mb, acq, rel, cl, op, asm_op)		\
+#define ATOMIC_OP_RETURN(name, mb, acq, rel, cl, op, asm_op, constraint)		\
 __LL_SC_INLINE int							\
 __LL_SC_PREFIX(atomic_##op##_return##name(int i, atomic_t *v))		\
 {									\
@@ -70,14 +70,14 @@ __LL_SC_PREFIX(atomic_##op##_return##name(int i, atomic_t *v))		\
 "	cbnz	%w1, 1b\n"						\
 "	" #mb								\
 	: "=&r" (result), "=&r" (tmp), "+Q" (v->counter)		\
-	: "Ir" (i)							\
+	: constraint "r" (i)							\
 	: cl);								\
 									\
 	return result;							\
 }									\
 __LL_SC_EXPORT(atomic_##op##_return##name);
 
-#define ATOMIC_FETCH_OP(name, mb, acq, rel, cl, op, asm_op)		\
+#define ATOMIC_FETCH_OP(name, mb, acq, rel, cl, op, asm_op, constraint)		\
 __LL_SC_INLINE int							\
 __LL_SC_PREFIX(atomic_fetch_##op##name(int i, atomic_t *v))		\
 {									\
@@ -92,7 +92,7 @@ __LL_SC_PREFIX(atomic_fetch_##op##name(int i, atomic_t *v))		\
 "	cbnz	%w2, 1b\n"						\
 "	" #mb								\
 	: "=&r" (result), "=&r" (val), "=&r" (tmp), "+Q" (v->counter)	\
-	: "Ir" (i)							\
+	: constraint "r" (i)							\
 	: cl);								\
 									\
 	return result;							\
@@ -110,8 +110,8 @@ __LL_SC_EXPORT(atomic_fetch_##op##name);
 	ATOMIC_FETCH_OP (_acquire,        , a,  , "memory", __VA_ARGS__)\
 	ATOMIC_FETCH_OP (_release,        ,  , l, "memory", __VA_ARGS__)
 
-ATOMIC_OPS(add, add)
-ATOMIC_OPS(sub, sub)
+ATOMIC_OPS(add, add, "I")
+ATOMIC_OPS(sub, sub, "J")
 
 #undef ATOMIC_OPS
 #define ATOMIC_OPS(...)							\
@@ -121,10 +121,10 @@ ATOMIC_OPS(sub, sub)
 	ATOMIC_FETCH_OP (_acquire,        , a,  , "memory", __VA_ARGS__)\
 	ATOMIC_FETCH_OP (_release,        ,  , l, "memory", __VA_ARGS__)
 
-ATOMIC_OPS(and, and)
-ATOMIC_OPS(andnot, bic)
-ATOMIC_OPS(or, orr)
-ATOMIC_OPS(xor, eor)
+ATOMIC_OPS(and, and, "K")
+ATOMIC_OPS(andnot, bic, ) // modified by alix
+ATOMIC_OPS(or, orr, "K")
+ATOMIC_OPS(xor, eor, "K")
 
 #undef ATOMIC_OPS
 #undef ATOMIC_FETCH_OP
