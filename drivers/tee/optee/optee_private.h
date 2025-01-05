@@ -135,6 +135,11 @@ void optee_handle_rpc(struct tee_context *ctx, struct optee_rpc_param *param);
 void optee_wait_queue_init(struct optee_wait_queue *wq);
 void optee_wait_queue_exit(struct optee_wait_queue *wq);
 
+int optee_shm_register(struct tee_context *ctx, struct tee_shm *shm,
+		       struct page **pages, size_t num_pages,
+		       unsigned long start);
+int optee_shm_unregister(struct tee_context *ctx, struct tee_shm *shm);
+
 u32 optee_supp_thrd_req(struct tee_context *ctx, u32 func, size_t num_params,
 			struct tee_param *param);
 

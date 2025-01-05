@@ -44,9 +44,16 @@ static void pool_op_gen_free(struct tee_shm_pool_mgr *poolm,
 	shm->kaddr = NULL;
 }
 
+static void pool_op_gen_destroy_poolmgr(struct tee_shm_pool_mgr *poolm)
+{
+	gen_pool_destroy(poolm->private_data);
+	kfree(poolm);
+}
+
 static const struct tee_shm_pool_mgr_ops pool_ops_generic = {
 	.alloc = pool_op_gen_alloc,
 	.free = pool_op_gen_free,
+	.destroy_poolmgr = pool_op_gen_destroy_poolmgr,
 };
 
 static void pool_res_mem_destroy(struct tee_shm_pool *pool)
@@ -140,6 +147,31 @@ err:
 	return ERR_PTR(ret);
 }
 EXPORT_SYMBOL_GPL(tee_shm_pool_alloc_res_mem);
+
+static bool check_mgr_ops(struct tee_shm_pool_mgr *mgr)
+{
+	return mgr && mgr->ops && mgr->ops->alloc && mgr->ops->free &&
+		mgr->ops->destroy_poolmgr;
+}
+
+struct tee_shm_pool *tee_shm_pool_alloc(struct tee_shm_pool_mgr *priv_mgr,
+					struct tee_shm_pool_mgr *dmabuf_mgr)
+{
+	struct tee_shm_pool *pool;
+
+	if (!check_mgr_ops(priv_mgr) || !check_mgr_ops(dmabuf_mgr))
+		return ERR_PTR(-EINVAL);
+
+	pool = kzalloc(sizeof(*pool), GFP_KERNEL);
+	if (!pool)
+		return ERR_PTR(-ENOMEM);
+
+	pool->private_mgr = *priv_mgr;
+	pool->dma_buf_mgr = *dmabuf_mgr;
+
+	return pool;
+}
+EXPORT_SYMBOL_GPL(tee_shm_pool_alloc);
 
 /**
  * tee_shm_pool_free() - Free a shared memory pool

@@ -27,6 +27,12 @@
 
 #define TEE_SHM_MAPPED		0x1	/* Memory mapped by the kernel */
 #define TEE_SHM_DMA_BUF		0x2	/* Memory with dma-buf handle */
+#define TEE_SHM_EXT_DMA_BUF	BIT(2)	/* Memory with dma-buf handle */
+#define TEE_SHM_REGISTER	BIT(3)  /* Memory registered in secure world */
+#define TEE_SHM_USER_MAPPED	BIT(4)  /* Memory mapped in user space */
+#define TEE_SHM_POOL		BIT(5)  /* Memory allocated from pool */
+#define TEE_SHM_KERNEL_MAPPED	BIT(6)  /* Memory mapped in kernel space */
+#define TEE_SHM_PRIV		BIT(7)  /* Memory private to TEE driver */
 
 struct device;
 struct tee_device;
@@ -150,6 +156,31 @@ int tee_device_register(struct tee_device *teedev);
 void tee_device_unregister(struct tee_device *teedev);
 
 /**
+ * struct tee_shm - shared memory object
+ * @teedev:	device used to allocate the object
+ * @ctx:	context using the object, if NULL the context is gone
+ * @link	link element
+ * @paddr:	physical address of the shared memory
+ * @kaddr:	virtual address of the shared memory
+ * @size:	size of shared memory
+ * @dmabuf:	dmabuf used to for exporting to user space
+ * @flags:	defined by TEE_SHM_* in tee_drv.h
+ * @id:		unique id of a shared memory object on this device
+ */
+struct tee_shm {
+	struct tee_device *teedev;
+	struct tee_context *ctx;
+	struct list_head link;
+	phys_addr_t paddr;
+	void *kaddr;
+	size_t size;
+	unsigned int offset;
+	struct dma_buf *dmabuf;
+	u32 flags;
+	int id;
+};
+
+/**
  * struct tee_shm_pool_mem_info - holds information needed to create a shared
  * memory pool
  * @vaddr:	Virtual address of start of pool
@@ -161,6 +192,51 @@ struct tee_shm_pool_mem_info {
 	phys_addr_t paddr;
 	size_t size;
 };
+
+struct tee_shm_pool_mgr;
+
+/**
+ * struct tee_shm_pool_mgr_ops - shared memory pool manager operations
+ * @alloc:	called when allocating shared memory
+ * @free:	called when freeing shared memory
+ */
+struct tee_shm_pool_mgr_ops {
+	int (*alloc)(struct tee_shm_pool_mgr *poolmgr, struct tee_shm *shm,
+		     size_t size);
+	void (*free)(struct tee_shm_pool_mgr *poolmgr, struct tee_shm *shm);
+	void (*destroy_poolmgr)(struct tee_shm_pool_mgr *poolmgr);
+};
+
+/**
+ * struct tee_shm_pool_mgr - shared memory manager
+ * @ops:		operations
+ * @private_data:	private data for the shared memory manager
+ */
+struct tee_shm_pool_mgr {
+	const struct tee_shm_pool_mgr_ops *ops;
+	void *private_data;
+};
+
+/**
+ * tee_shm_pool_mgr_destroy() - Free a shared memory manager
+ */
+static inline void tee_shm_pool_mgr_destroy(struct tee_shm_pool_mgr *poolm)
+{
+        poolm->ops->destroy_poolmgr(poolm);
+}
+
+/**
+ * tee_shm_pool_alloc() - Create a shared memory pool from shm managers
+ * @priv_mgr:	manager for driver private shared memory allocations
+ * @dmabuf_mgr:	manager for dma-buf shared memory allocations
+ *
+ * Allocation with the flag TEE_SHM_DMA_BUF set will use the range supplied
+ * in @dmabuf, others will use the range provided by @priv.
+ *
+ * @returns pointer to a 'struct tee_shm_pool' or an ERR_PTR on failure.
+ */
+struct tee_shm_pool *tee_shm_pool_alloc(struct tee_shm_pool_mgr *priv_mgr,
+					struct tee_shm_pool_mgr *dmabuf_mgr);
 
 /**
  * tee_shm_pool_alloc_res_mem() - Create a shared memory pool from reserved
@@ -178,6 +254,26 @@ struct tee_shm_pool_mem_info {
 struct tee_shm_pool *
 tee_shm_pool_alloc_res_mem(struct tee_shm_pool_mem_info *priv_info,
 			   struct tee_shm_pool_mem_info *dmabuf_info);
+
+/**
+ * tee_shm_get_size() - Get size of shared memory buffer
+ * @shm:	Shared memory handle
+ * @returns size of shared memory
+ */
+static inline size_t tee_shm_get_size(struct tee_shm *shm)
+{
+	return shm->size;
+}
+
+/**
+ * tee_shm_get_page_offset() - Get shared buffer offset from page start
+ * @shm:	Shared memory handle
+ * @returns page offset of shared buffer
+ */
+static inline size_t tee_shm_get_page_offset(struct tee_shm *shm)
+{
+	return shm->offset;
+}
 
 /**
  * tee_shm_pool_free() - Free a shared memory pool

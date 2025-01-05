@@ -94,6 +94,11 @@
 #define OPTEE_MSG_LOGIN_APPLICATION_USER	0x00000005
 #define OPTEE_MSG_LOGIN_APPLICATION_GROUP	0x00000006
 
+/*
+ * Page size used in non-contiguous buffer entries
+ */
+#define OPTEE_MSG_NONCONTIG_PAGE_SIZE		4096
+
 /**
  * struct optee_msg_param_tmem - temporary memory reference parameter
  * @buf_ptr:	Address of the buffer

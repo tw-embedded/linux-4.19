@@ -28,6 +28,7 @@
 #include <linux/uaccess.h>
 #include "optee_private.h"
 #include "optee_smc.h"
+#include "shm_pool.h"
 
 #define DRIVER_NAME "optee"
 
@@ -220,7 +221,7 @@ static void optee_release(struct tee_context *ctx)
 	if (!ctxdata)
 		return;
 
-	shm = tee_shm_alloc(ctx, sizeof(struct optee_msg_arg), TEE_SHM_MAPPED);
+	shm = tee_shm_alloc(ctx, sizeof(struct optee_msg_arg), TEE_SHM_MAPPED | TEE_SHM_PRIV);
 	if (!IS_ERR(shm)) {
 		arg = tee_shm_get_va(shm, 0);
 		/*
@@ -446,6 +447,33 @@ static optee_invoke_fn *get_invoke_func(struct device_node *np)
 	return ERR_PTR(-EINVAL);
 }
 
+static struct tee_shm_pool *optee_config_dyn_shm(void)
+{
+	struct tee_shm_pool_mgr *priv_mgr;
+	struct tee_shm_pool_mgr *dmabuf_mgr;
+	void *rc;
+
+	rc = optee_shm_pool_alloc_pages();
+	if (IS_ERR(rc))
+		return rc;
+	priv_mgr = rc;
+
+	rc = optee_shm_pool_alloc_pages();
+	if (IS_ERR(rc)) {
+		tee_shm_pool_mgr_destroy(priv_mgr);
+		return rc;
+	}
+	dmabuf_mgr = rc;
+
+	rc = tee_shm_pool_alloc(priv_mgr, dmabuf_mgr);
+	if (IS_ERR(rc)) {
+		tee_shm_pool_mgr_destroy(priv_mgr);
+		tee_shm_pool_mgr_destroy(dmabuf_mgr);
+	}
+
+	return rc;
+}
+
 static struct optee *optee_probe(struct device_node *np)
 {
 	optee_invoke_fn *invoke_fn;
@@ -475,6 +503,20 @@ static struct optee *optee_probe(struct device_node *np)
 		return ERR_PTR(-EINVAL);
 	}
 
+#if 1
+	// alix mod
+	/*
+	 * Try to use dynamic shared memory if possible
+	 */
+	if (sec_caps & OPTEE_SMC_SEC_CAP_DYNAMIC_SHM)
+		pool = optee_config_dyn_shm();
+
+	/*
+	 * If dynamic shared memory is not available or failed - try static one
+	 */
+	if (IS_ERR(pool) && (sec_caps & OPTEE_SMC_SEC_CAP_HAVE_RESERVED_SHM))
+		pool = optee_config_shm_memremap(invoke_fn, &memremaped_shm);
+#else
 	/*
 	 * We have no other option for shared memory, if secure world
 	 * doesn't have any reserved memory we can use we can't continue.
@@ -483,6 +525,7 @@ static struct optee *optee_probe(struct device_node *np)
 		return ERR_PTR(-EINVAL);
 
 	pool = optee_config_shm_memremap(invoke_fn, &memremaped_shm);
+#endif
 	if (IS_ERR(pool))
 		return (void *)pool;
 
