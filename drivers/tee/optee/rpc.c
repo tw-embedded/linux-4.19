@@ -245,7 +245,7 @@ static void handle_rpc_func_cmd_shm_alloc(struct tee_context *ctx,
 		goto bad;
 	}
 
-	arg->params[0].attr = OPTEE_MSG_ATTR_TYPE_TMEM_OUTPUT;
+	arg->params[0].attr = OPTEE_MSG_ATTR_TYPE_TMEM_OUTPUT | OPTEE_MSG_ATTR_FRAGMENT;
 	arg->params[0].u.tmem.buf_ptr = pa;
 	arg->params[0].u.tmem.size = sz;
 	arg->params[0].u.tmem.shm_ref = (unsigned long)shm;
