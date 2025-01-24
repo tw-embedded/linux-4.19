@@ -175,6 +175,8 @@ struct tee_shm {
 	void *kaddr;
 	size_t size;
 	unsigned int offset;
+	struct page **pages;
+	size_t num_pages;
 	struct dma_buf *dmabuf;
 	u32 flags;
 	int id;
@@ -370,5 +372,28 @@ int tee_shm_get_id(struct tee_shm *shm);
  * @returns a pointer to 'struct tee_shm' on success or an ERR_PTR on failure
  */
 struct tee_shm *tee_shm_get_from_id(struct tee_context *ctx, int id);
+
+/**
+ * tee_shm_get_pages() - Get list of pages that hold shared buffer
+ * @shm:	Shared memory handle
+ * @num_pages:	Number of pages will be stored there
+ * @returns pointer to pages array
+ */
+static inline struct page **tee_shm_get_pages(struct tee_shm *shm,
+					      size_t *num_pages)
+{
+	*num_pages = shm->num_pages;
+	return shm->pages;
+}
+
+/**
+ * tee_shm_is_registered() - Check if shared memory object in registered in TEE
+ * @shm:	Shared memory handle
+ * @returns true if object is registered in TEE
+ */
+static inline bool tee_shm_is_registered(struct tee_shm *shm)
+{
+	return shm && (shm->flags & TEE_SHM_REGISTER);
+}
 
 #endif /*__TEE_DRV_H*/

@@ -130,7 +130,15 @@ struct optee_rpc_param {
 	u32	a7;
 };
 
-void optee_handle_rpc(struct tee_context *ctx, struct optee_rpc_param *param);
+/* Holds context that is preserved during one STD call */
+struct optee_call_ctx {
+	/* information about pages list used in last allocation */
+	void *pages_list;
+	size_t num_entries;
+};
+
+void optee_handle_rpc(struct tee_context *ctx, struct optee_rpc_param *param, struct optee_call_ctx *call_ctx);
+void optee_rpc_finalize_call(struct optee_call_ctx *call_ctx);
 
 void optee_wait_queue_init(struct optee_wait_queue *wq);
 void optee_wait_queue_exit(struct optee_wait_queue *wq);
@@ -169,6 +177,11 @@ int optee_from_msg_param(struct tee_param *params, size_t num_params,
 			 const struct optee_msg_param *msg_params);
 int optee_to_msg_param(struct optee_msg_param *msg_params, size_t num_params,
 		       const struct tee_param *params);
+
+u64 *optee_allocate_pages_list(size_t num_entries);
+void optee_free_pages_list(void *array, size_t num_entries);
+void optee_fill_pages_list(u64 *dst, struct page **pages, int num_pages,
+			   size_t page_offset);
 
 /*
  * Small helpers

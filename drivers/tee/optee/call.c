@@ -137,6 +137,7 @@ u32 optee_do_call_with_arg(struct tee_context *ctx, phys_addr_t parg)
 	struct optee *optee = tee_get_drvdata(ctx->teedev);
 	struct optee_call_waiter w;
 	struct optee_rpc_param param = { };
+	struct optee_call_ctx call_ctx = { };
 	u32 ret;
 
 	param.a0 = OPTEE_SMC_CALL_WITH_ARG;
@@ -161,12 +162,14 @@ u32 optee_do_call_with_arg(struct tee_context *ctx, phys_addr_t parg)
 			param.a1 = res.a1;
 			param.a2 = res.a2;
 			param.a3 = res.a3;
-			optee_handle_rpc(ctx, &param);
+			optee_handle_rpc(ctx, &param, &call_ctx);
 		} else {
 			ret = res.a0;
 			break;
 		}
 	}
+
+	optee_rpc_finalize_call(&call_ctx);
 
 	/*
 	 * We're done with our thread in secure world, if there's any
